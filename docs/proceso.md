@@ -264,3 +264,100 @@ La función auxiliar `masHonda` recorre la lista de órdenes de una secuencia y 
 con la profundidad mayor. Para la lista vacía devuelve 0, por eso `Secuencia(Nil)` tiene
 profundidad 1. En `Repetir` no se multiplica por `veces`: la profundidad mide cuántos
 niveles de anidamiento hay y no cuántas veces se repite.
+
+
+# Informe de proceso: puntos 1 y 4
+
+## Punto 1: girar
+
+### Funcionamiento
+
+La función girar recibe una dirección y un sentido de giro. Mediante un match, contempla las ocho combinaciones posibles entre las cuatro direcciones (Norte, Este, Sur y Oeste) y los dos sentidos (Derecha e Izquierda). En cada caso devuelve la dirección que resulta de girar noventa grados, sin modificar la posición del robot.
+
+### Traza de cuatro giros a la izquierda
+
+Esta traza corresponde a la prueba propia que comprueba que cuatro giros a la izquierda devuelven la dirección inicial:
+
+girar(Norte, Izquierda) = Oeste
+girar(Oeste, Izquierda) = Sur
+girar(Sur, Izquierda)   = Este
+girar(Este, Izquierda)  = Norte
+
+Después de los cuatro giros, la dirección vuelve a ser Norte. No hay llamadas recursivas en esta función: cada combinación se resuelve directamente mediante uno de los casos del match.
+
+## Punto 4: componer, rutina, aplicarA y transformar
+
+### componer
+
+La función construye una Secuencia con las dos órdenes recibidas, manteniendo su orden original: primero se coloca o1 y después o2.
+
+#### Traza de la prueba propia
+
+componer(Girar(Izquierda), Avanzar(3))
+= Secuencia(List(Girar(Izquierda), Avanzar(3)))
+
+La traza muestra que la orden de giro queda antes que la orden de avance, tal como se indicó en la llamada.
+
+### rutina
+
+La función construye una orden Repetir que contiene una secuencia formada por un avance y un giro. Los parámetros indican cuántos pasos avanzar, en qué sentido girar y cuántas veces repetir la secuencia.
+
+#### Traza de la prueba propia
+
+rutina(3)(Derecha)(0)
+= Repetir(0, Secuencia(List(Avanzar(3), Girar(Derecha))))
+La rutina construida tiene cero repeticiones. Por eso, al ejecutarla, el robot permanece en su estado inicial:
+ejecutar(inicial, rutina(3)(Derecha)(0))
+= inicial
+
+La función construye la orden; el movimiento se produce cuando esa orden se entrega a ejecutar.
+
+### aplicarA
+
+La función recorre recursivamente una lista de estados. En cada llamada, ejecuta la misma orden sobre el primer estado y añade el resultado a la lista que devuelve la llamada recursiva sobre el resto. Cuando la lista está vacía (Nil), devuelve Nil, que constituye el caso base.
+
+#### Traza con los estados de la prueba propia
+
+aplicarA(
+  List(Estado(1, 2, Norte), Estado(4, 5, Este)),
+  Avanzar(2)
+)
+= Estado(1, 4, Norte) ::
+    aplicarA(List(Estado(4, 5, Este)), Avanzar(2))
+= Estado(1, 4, Norte) ::
+    (Estado(6, 5, Este) :: aplicarA(Nil, Avanzar(2)))
+= Estado(1, 4, Norte) ::
+    (Estado(6, 5, Este) :: Nil)
+= List(Estado(1, 4, Norte), Estado(6, 5, Este))
+
+Cada estado se procesa una vez y se conserva el orden de la lista original. La recursión termina al llegar a Nil; entonces las llamadas pendientes construyen la lista de resultados con ::.
+
+### transformar
+
+La función aplica una transformación a las órdenes básicas (Avanzar y Girar) y conserva la estructura de las órdenes compuestas. En una orden Repetir, transforma recursivamente la orden contenida y conserva el número de repeticiones. En una Secuencia, transforma cada elemento de la lista y mantiene su orden.
+
+#### Traza de la prueba propia
+
+La prueba define una función que cambia los giros a la derecha por giros a la izquierda y deja las demás órdenes sin cambios. Con cuadrado = Repetir(4, Secuencia(List(Avanzar(1), Girar(Derecha)))), la transformación produce:
+
+transformar(Repetir(4, Secuencia(List(Avanzar(1), Girar(Derecha)))), f)
+= Repetir(4, transformar(Secuencia(List(Avanzar(1), Girar(Derecha))), f))
+= Repetir(4, Secuencia(List(
+    transformar(Avanzar(1), f),
+    transformar(Girar(Derecha), f)
+  )))
+= Repetir(4, Secuencia(List(Avanzar(1), Girar(Izquierda))))
+
+El avance permanece igual y el giro cambia de Derecha a Izquierda, como espera la prueba.
+
+#### Traza de una secuencia vacía
+
+La otra prueba propia comprueba que transformar una secuencia vacía con la función identidad la deja igual:
+transformar(Secuencia(Nil), identidad)
+= Secuencia(Nil)
+## Resumen del proceso
+- girar resuelve cada combinación de dirección y sentido mediante un match.
+- componer agrupa dos órdenes en una secuencia, conservando su orden.
+- rutina construye una orden repetida que contiene un avance y un giro.
+- aplicarA recorre recursivamente una lista de estados y ejecuta una orden sobre cada uno.
+- transformar recorre las órdenes compuestas, transforma las órdenes básicas y reconstruye la estructura original.

@@ -17,7 +17,17 @@ class RobotCuadricula {
   // Punto 1 -------------------------------------------------------------------
 
   /** La dirección que queda tras girar noventa grados hacia el sentido dado. */
-  def girar(d: Direccion, s: Sentido): Direccion = ???
+  def girar(d: Direccion, s: Sentido): Direccion = (d, s) match {
+    case (Norte, Derecha) => Este
+    case (Este, Derecha) => Sur
+    case (Sur, Derecha) => Oeste
+    case (Oeste, Derecha) => Norte
+  
+    case (Norte, Izquierda) => Oeste
+    case (Oeste, Izquierda) => Sur
+    case (Sur, Izquierda) => Este
+    case (Este, Izquierda) => Norte
+  }
 
   // Punto 2 -------------------------------------------------------------------
 
@@ -67,17 +77,27 @@ class RobotCuadricula {
   // Punto 4 -------------------------------------------------------------------
 
   /** La secuencia de las dos órdenes. */
-  def componer(o1: Orden, o2: Orden): Orden = ???
+  def componer(o1: Orden, o2: Orden): Orden = Secuencia(List(o1, o2))
 
   /** Currificada: fijados los pasos y el giro, queda una función de las veces. */
-  def rutina(pasos: Int)(giro: Sentido)(veces: Int): Orden = ???
+  def rutina(pasos: Int)(giro: Sentido)(veces: Int): Orden = 
+    Repetir(veces, Secuencia(List(Avanzar(pasos), Girar(giro))))
 
   /** La misma orden ejecutada sobre cada uno de los estados. */
-  def aplicarA(estados: List[Estado], o: Orden): List[Estado] = ???
+  def aplicarA(estados: List[Estado], o: Orden): List[Estado] = estados match {
+    case Nil => Nil
+    case primero :: resto => ejecutar(primero, o) :: aplicarA(resto, o) 
+    }
 
   /** Reemplaza cada orden básica por f(orden), respetando la estructura de las compuestas. */
-  def transformar(o: Orden, f: Orden => Orden): Orden = ???
-
+  def transformar(o: Orden, f: Orden => Orden): Orden = o match {
+    case Avanzar(_) => f(o)
+    case Girar(_) => f(o)
+    case Repetir(veces, orden) =>
+      Repetir(veces, transformar(orden, f))
+    case Secuencia(ordenes) =>
+      Secuencia(ordenes.map(orden => transformar(orden, f)))
+  }
   // Punto 5 -------------------------------------------------------------------
 
   /** Una orden equivalente más corta, con las reglas del enunciado. */

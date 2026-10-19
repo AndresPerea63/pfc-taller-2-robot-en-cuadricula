@@ -12,6 +12,32 @@ class RobotCuadriculaPropiasTest extends AnyFunSuite {
 
   val cuadrado = Repetir(4, Secuencia(List(Avanzar(1), Girar(Derecha))))
 
+
+  // Punto 1: girar ------------------------------------------------------------
+
+  test("girar propia: Este a la derecha da Sur") {
+    assert(girar(Este, Derecha) == Sur)
+  }
+
+  test("girar propia: Norte a la izquierda da Oeste") {
+    assert(girar(Norte, Izquierda) == Oeste)
+  }
+
+  test("girar propia: Sur a la derecha da Oeste") {
+    assert(girar(Sur, Derecha) == Oeste)
+  }
+
+  test("girar propia: Oeste a la izquierda da Sur") {
+    assert(girar(Oeste, Izquierda) == Sur)
+  }
+
+  test("girar propia: cuatro giros a la izquierda vuelven al Norte") {
+    val resultado = List(Izquierda, Izquierda, Izquierda, Izquierda)
+      .foldLeft(Norte: Direccion)((direccion, sentido) => girar(direccion, sentido))
+
+    assert(resultado == Norte)
+  }
+
   // Punto 2 -------------------------------------------------------------------
 
   test("ejecutar propia: avanzar al este aumenta x") {
@@ -97,5 +123,42 @@ class RobotCuadriculaPropiasTest extends AnyFunSuite {
 
   test("profundidad propia: tres secuencias anidadas con una básica dan profundidad 4") {
     assert(profundidad(Secuencia(List(Secuencia(List(Secuencia(List(Avanzar(1)))))))) == 4)
+  }
+
+
+  // Punto 4: componer, rutina, aplicarA y transformar -------------------------
+
+  test("punto 4 propio: componer conserva el orden de las órdenes") {
+    assert(
+      componer(Girar(Izquierda), Avanzar(3)) ==
+        Secuencia(List(Girar(Izquierda), Avanzar(3)))
+    )
+  }
+
+  test("punto 4 propio: rutina con cero repeticiones no mueve el robot") {
+    assert(ejecutar(inicial, rutina(3)(Derecha)(0)) == inicial)
+  }
+
+  test("punto 4 propio: aplicarA conserva el resultado para cada estado") {
+    assert(
+      aplicarA(List(Estado(1, 2, Norte), Estado(4, 5, Este)), Avanzar(2)) ==
+        List(Estado(1, 4, Norte), Estado(6, 5, Este))
+    )
+  }
+
+  test("punto 4 propio: transformar modifica los giros y conserva los avances") {
+    val resultado = transformar(cuadrado, {
+      case Girar(Derecha) => Girar(Izquierda)
+      case otra => otra
+    })
+
+    assert(
+      resultado ==
+        Repetir(4, Secuencia(List(Avanzar(1), Girar(Izquierda))))
+    )
+  }
+
+  test("punto 4 propio: transformar conserva una secuencia vacía") {
+    assert(transformar(Secuencia(Nil), (o: Orden) => o) == Secuencia(Nil))
   }
 }

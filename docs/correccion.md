@@ -435,3 +435,89 @@ flowchart TD
     D --> E["max(1, masHonda(Nil) = 0) = 1"]
     E --> F["resultado: 1 + (1 + 1) = 3"]
 ```
+
+
+## Informe de corrección: puntos 1 y 4
+
+
+Las funciones se justifican a partir de su especificación y de los casos que contempla la implementación. En el punto 1 se revisan las ocho combinaciones posibles de dirección y sentido. En el punto 4 se explica cómo cada función construye o recorre las órdenes del tipo recursivo Orden.
+
+## Punto 1: girar
+
+### Especificación
+
+La función girar(d, s) devuelve la dirección que resulta de girar noventa grados desde la dirección d, en el sentido s. La posición del robot no cambia.
+
+La especificación puede resumirse así:
+| Dirección inicial | Giro a la derecha | Giro a la izquierda |
+|-------------------|-------------------|---------------------|
+| Norte             | Este              | Oeste               |
+| Este              | Sur               | Norte               |
+| Sur               | Oeste             | Este                |
+| Oeste             | Norte             | Sur                 |
+
+
+### Demostración
+
+La implementación utiliza un match sobre el par (d, s) y define un caso para cada combinación de dirección y sentido. Cada caso devuelve la dirección indicada en la tabla. Como están contempladas las cuatro direcciones y los dos sentidos posibles, la función cubre todas las entradas válidas y devuelve la dirección esperada.
+
+### Comprobación mediante pruebas
+
+Las pruebas originales comprueban giros concretos, cuatro giros consecutivos y la cancelación entre un giro y su contrario. Además, se añadieron cinco pruebas propias para verificar otras combinaciones y que cuatro giros a la izquierda devuelven la dirección inicial.
+
+### Proceso de implementación
+1. Se identificaron las cuatro direcciones y los dos sentidos de giro.
+2. Se utilizó match para contemplar las ocho combinaciones posibles.
+3. Se devolvió la dirección correspondiente en cada caso.
+4. Se ejecutaron las pruebas originales y se añadieron cinco pruebas propias para ampliar la comprobación.
+
+## Punto 4: componer, rutina, aplicarA y transformar
+
+### componer
+
+Especificación. Recibe dos órdenes y devuelve una orden que las ejecuta en el mismo orden.
+
+Demostración. La implementación devuelve Secuencia(List(o1, o2)). La secuencia conserva primero o1 y después o2; por tanto, al ejecutarla, las órdenes se aplican en el orden solicitado.
+
+Traza. Para componer(Avanzar(1), Girar(Derecha)), el resultado es Secuencia(List(Avanzar(1), Girar(Derecha))).
+
+### rutina
+
+Especificación. Recibe la cantidad de pasos, el sentido del giro y el número de repeticiones. Devuelve una orden que repite una secuencia de avance y giro.
+
+Demostración. La implementación construye Repetir(veces, Secuencia(List(Avanzar(pasos), Girar(giro)))). Así, cada repetición ejecuta primero el avance y luego el giro. Si veces es cero, la orden no se ejecuta y el estado del robot no cambia.
+
+Traza. rutina(1)(Derecha)(4) construye Repetir(4, Secuencia(List(Avanzar(1), Girar(Derecha)))), que corresponde a la orden del cuadrado utilizada en las pruebas.
+
+### aplicarA
+
+Especificación. Aplica una misma orden a cada estado de una lista y devuelve los estados resultantes, manteniendo su orden.
+
+Demostración. La implementación realiza recursión sobre la lista. Para Nil, devuelve Nil. Para primero :: resto, ejecuta la orden sobre primero y añade ese resultado a la llamada recursiva sobre resto. Por tanto, cada estado se procesa una vez, con la misma orden, y se conserva el orden de la lista.
+
+Traza. Al aplicar Avanzar(2) a List(Estado(0, 0, Norte), Estado(5, 5, Sur)), se obtiene List(Estado(0, 2, Norte), Estado(5, 3, Sur)).
+
+### transformar
+
+Especificación. Reemplaza cada orden básica por el resultado de aplicar la función f, conservando la estructura de las órdenes compuestas.
+
+Demostración. La implementación distingue los casos de Orden mediante match:
+- Avanzar y Girar: aplica f a la orden básica.
+- Repetir(veces, orden): transforma recursivamente la orden contenida y conserva el número de repeticiones.
+- Secuencia(ordenes): transforma cada elemento de la lista mediante map, conservando su orden.
+Así, la función aplica la transformación a las órdenes básicas y reconstruye las órdenes compuestas con la misma estructura.
+
+Traza. Al transformar el cuadrado con una función que duplica los avances y deja los giros sin cambios, el resultado es Repetir(4, Secuencia(List(Avanzar(2), Girar(Derecha)))).
+
+### Comprobación mediante pruebas
+
+Las pruebas originales comprueban que componer conserva el orden de las órdenes, que rutina construye el cuadrado, que aplicarA procesa varios estados y que transformar puede modificar los avances sin alterar los giros. También se comprueba que la función identidad no cambia la orden.
+
+Se añadieron cinco pruebas propias para el punto 4: una para componer, una para rutina, una para aplicarA y dos para transformar, incluyendo una secuencia vacía.
+
+### Proceso de implementación
+1. componer: se construyó una secuencia con las dos órdenes recibidas.
+2. rutina: se construyó una orden Repetir que contiene una secuencia de avance y giro.
+3. aplicarA: se recorrió recursivamente la lista de estados y se ejecutó la orden sobre cada uno.
+4. transformar: se trataron los casos básicos y se reconstruyeron recursivamente los casos compuestos.
+Para la comprobación se ejecutaron las pruebas automáticas del proyecto. Las pruebas del punto 1 y del punto 4 pasaron; los fallos que aparecieron en la ejecución compartida correspondían a simplificar, del punto 5, que todavía no estaba implementado.

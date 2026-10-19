@@ -16,10 +16,9 @@ la nota.
 
 | Nombre completo | Código |
 |---|---|
-| | |
-| | |
-| | |
-| | |
+| Diego Fernando Perez | 202559956 |
+| Andres David Perea Rios | 202559770 |
+| Santiago Romero Restrepo | 202559949 |
 
 ## Cómo está organizado el proyecto
 
