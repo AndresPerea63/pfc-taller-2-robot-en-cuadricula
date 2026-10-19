@@ -277,3 +277,161 @@ s_0 = (a_1, \text{List}(a_2, \ldots, a_k)) \implies a_1 = f(\text{List}(a_1))
 $k$ iteraciones, $l = \text{List}()$.
 
 Esto implica que $P_f(L) == \text{maxAux}(L.\text{head}, L.\text{tail}) == f(L)$
+
+
+---
+
+# Informe de corrección: puntos 2 y 3
+
+## Cómo se argumenta la corrección
+
+Para un programa $P_f$ que calcula una función $f$ sobre `Orden`, se demuestra que
+
+```math
+\forall o \in \text{Orden} : P_f(o) == f(o)
+```
+
+`Orden` es un tipo recursivo con cuatro casos: `Avanzar`, `Girar`, `Repetir` y `Secuencia`. Por eso la
+demostración es una **inducción estructural**: un caso por cada alternativa, y en los
+casos compuestos la hipótesis de inducción vale para las órdenes que contienen. Se usa
+el modelo de sustitución: las funciones no tienen variables mutables ni efectos, así que
+cada llamado se puede reemplazar por su resultado.
+
+## Punto 2: `ejecutar`
+
+### Especificación
+
+Sea $\text{g}(d, s)$ la dirección tras girar $d$ en el sentido $s$ (punto 1, que se toma
+como correcto) y sea $\delta(d)$ el vector unitario de la dirección $d$:
+$\delta(N) = (0, 1)$, $\delta(E) = (1, 0)$, $\delta(S) = (0, -1)$, $\delta(O) = (-1, 0)$.
+
+$$
+E(x, y, d, \text{Avanzar}(n)) = (x + n\,\delta_x(d),\; y + n\,\delta_y(d),\; d)
+\qquad
+E(x, y, d, \text{Girar}(s)) = (x, y, \text{g}(d, s))
+$$
+
+$$
+E(e, \text{Repetir}(v, o)) =
+\begin{cases}
+e & \text{si } v \le 0 \\
+E\big(E(e, o),\ \text{Repetir}(v - 1, o)\big) & \text{si } v > 0
+\end{cases}
+$$
+
+$$
+E(e, \text{Secuencia}(\text{Nil})) = e
+\qquad
+E(e, \text{Secuencia}(o_1 :: \text{resto})) = E\big(E(e, o_1),\ \text{Secuencia}(\text{resto})\big)
+$$
+
+Es decir, repetir $v$ veces es aplicar $v$ veces la orden y una secuencia es aplicar sus
+órdenes de izquierda a derecha.
+
+### Demostración
+
+Se hace inducción estructural sobre $o$. Dentro de `Repetir` hay una segunda inducción
+sobre $v$, y dentro de `Secuencia` una sobre la longitud de la lista.
+
+- **`Avanzar(n)`.** El programa hace `match` sobre `e.mira`. En cada una de las cuatro
+  direcciones suma o resta $n$ a la coordenada correcta y conserva la dirección, que es
+  exactamente $E(x, y, d, \text{Avanzar}(n))$.
+- **`Girar(s)`.** El programa devuelve `Estado(e.x, e.y, girar(e.mira, s))`, que es
+  $E(x, y, d, \text{Girar}(s))$ por el punto 1.
+- **`Repetir(v, o')`.** Si $v \le 0$ el programa devuelve `e`, igual que la especificación.
+  Si $v > 0$ devuelve `ejecutar(ejecutar(e, o'), Repetir(v - 1, o'))`. Por hipótesis de
+  inducción sobre $o'$, el llamado interno es $E(e, o')$. Por la segunda inducción, sobre
+  $v - 1 < v$, el llamado externo es $E(E(e, o'), \text{Repetir}(v - 1, o'))$. Es la
+  especificación.
+- **`Secuencia(Nil)`.** Devuelve `e`, como la especificación.
+- **`Secuencia(o1 :: resto)`.** Devuelve `ejecutar(ejecutar(e, o1), Secuencia(resto))`.
+  Por hipótesis de inducción sobre $o_1$ el llamado interno es $E(e, o_1)$, y como
+  `resto` es más corta que la lista original, el externo es
+  $E(E(e, o_1), \text{Secuencia}(\text{resto}))$.
+
+**Terminación.** En cada llamado recursivo o bien la orden es una parte propia de la
+original, o bien baja `veces` en 1, o bien la lista se acorta. Todas se acercan a un caso
+base, así que el cálculo termina. Por lo tanto $P_{ejecutar}$ es correcto. $\blacksquare$
+
+### Cómo se encadenan los llamados
+
+Con `ejecutar(inicial, Repetir(2, S))` y `S = Secuencia(List(Avanzar(1), Girar(Derecha)))`:
+
+1. `ejecutar` entra al caso `Repetir` con `veces = 2` y llama a `ejecutar(inicial, S)`.
+2. Ese llamado recorre `S`: aplica `Avanzar(1)` y deja `(0,1,Norte)`, aplica `Girar(Derecha)` y
+   deja `(0,1,Este)`, y la secuencia vacía devuelve ese estado.
+3. Con `(0,1,Este)` se llama a `Repetir(1, S)`, que repite el paso 2 y da `(1,1,Sur)`.
+4. Por último `Repetir(0, S)` devuelve el estado sin cambios: `Estado(1, 1, Sur)`.
+
+```mermaid
+flowchart TD
+    A["ejecutar(inicial, Repetir(2, S))"] --> B["ejecutar(inicial, S) = (0,1,Este)"]
+    B --> C["ejecutar((0,1,Este), Repetir(1, S))"]
+    C --> D["ejecutar((0,1,Este), S) = (1,1,Sur)"]
+    D --> E["ejecutar((1,1,Sur), Repetir(0, S)) = (1,1,Sur)"]
+```
+
+## Punto 3: `cuantasBasicas` y `profundidad`
+
+### `cuantasBasicas`
+
+**Especificación.** Es el número de `Avanzar` y `Girar` que se llegan a ejecutar:
+
+$$
+B(\text{Avanzar}(n)) = B(\text{Girar}(s)) = 1
+\qquad
+B(\text{Repetir}(v, o)) = \max(v, 0) \cdot B(o)
+\qquad
+B(\text{Secuencia}(o_1, \dots, o_k)) = \sum_{i=1}^{k} B(o_i)
+$$
+
+**Demostración.** Inducción estructural sobre $o$.
+
+- **Básicas.** El programa devuelve 1 para `Avanzar` y para `Girar`, igual que $B$.
+- **`Repetir(v, o')`.** Si $v \le 0$ devuelve 0 $= \max(v, 0)\cdot B(o')$. Si $v > 0$ devuelve
+  `v * cuantasBasicas(o')`, que por hipótesis de inducción es $v \cdot B(o')$.
+- **`Secuencia(Nil)`.** Devuelve 0, la suma vacía.
+- **`Secuencia(o1 :: resto)`.** Devuelve `cuantasBasicas(o1) + cuantasBasicas(Secuencia(resto))`.
+  Por hipótesis de inducción esto es $B(o_1) + \sum_{i \ge 2} B(o_i) = \sum_{i \ge 1} B(o_i)$. $\blacksquare$
+
+**Traza.** $B(\text{cuadrado}) = 4 \cdot (1 + (1 + 0)) = 8$: `Repetir` multiplica por 4 el
+resultado de la secuencia, y la secuencia suma un `Avanzar`, un `Girar` y la lista vacía.
+
+### `profundidad`
+
+**Especificación.**
+
+$$
+D(\text{Avanzar}(n)) = D(\text{Girar}(s)) = 1
+\qquad
+D(\text{Repetir}(v, o)) = 1 + D(o)
+\qquad
+D(\text{Secuencia}(o_1, \dots, o_k)) = 1 + M(o_1, \dots, o_k)
+$$
+
+donde $M$ es el máximo de los $D(o_i)$ y vale $0$ para la lista vacía. Así
+$D(\text{Secuencia}(\text{Nil})) = 1$.
+
+**Demostración.** Inducción estructural sobre $o$, con una inducción auxiliar sobre la
+longitud de la lista para `masHonda`.
+
+- **Auxiliar.** `masHonda(Nil)` devuelve 0, igual que $M$ en la lista vacía. Para
+  `primera :: resto` devuelve `max(profundidad(primera), masHonda(resto))`. Por hipótesis
+  de inducción sobre la orden y sobre la lista más corta, es
+  $\max(D(o_1), M(o_2, \dots, o_k)) = M(o_1, \dots, o_k)$.
+- **Básicas.** Devuelven 1.
+- **`Repetir(v, o')`.** Devuelve `1 + profundidad(o')`, que por hipótesis de inducción es
+  $1 + D(o')$. No depende de $v$.
+- **`Secuencia(os)`.** Devuelve `1 + masHonda(os)`, que por la auxiliar es $1 + M(os)$. $\blacksquare$
+
+**Traza.** $D(\text{cuadrado}) = 1 + (1 + \max(1, \max(1, 0))) = 3$: la `Repetir` suma un
+nivel, la `Secuencia` suma otro, y las básicas valen 1.
+
+```mermaid
+flowchart TD
+    A["profundidad(Repetir(4, S))"] --> B["1 + profundidad(S)"]
+    B --> C["1 + masHonda(List(Avanzar(1), Girar(Derecha)))"]
+    C --> D["max(profundidad(Avanzar(1)) = 1, masHonda(List(Girar(Derecha))))"]
+    D --> E["max(1, masHonda(Nil) = 0) = 1"]
+    E --> F["resultado: 1 + (1 + 1) = 3"]
+```

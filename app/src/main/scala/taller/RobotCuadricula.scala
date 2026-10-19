@@ -22,15 +22,47 @@ class RobotCuadricula {
   // Punto 2 -------------------------------------------------------------------
 
   /** El estado que resulta de aplicarle la orden al estado dado. */
-  def ejecutar(e: Estado, o: Orden): Estado = ???
+  def ejecutar(e: Estado, o: Orden): Estado = o match {
+    case Avanzar(n) => e.mira match {
+      case Norte => Estado(e.x, e.y + n, Norte)
+      case Este => Estado(e.x + n, e.y, Este)
+      case Sur => Estado(e.x, e.y - n, Sur)
+      case Oeste => Estado(e.x - n, e.y, Oeste)
+    }
+    case Girar(s) => Estado(e.x, e.y, girar(e.mira, s))
+    case Repetir(veces, orden) =>
+      if (veces <= 0) e // repetir cero veces (o menos) no hace nada
+      else ejecutar(ejecutar(e, orden), Repetir(veces - 1, orden)) // una vuelta y quedan veces - 1
+    case Secuencia(Nil) => e
+    case Secuencia(primera :: resto) => ejecutar(ejecutar(e, primera), Secuencia(resto))
+  }
 
   // Punto 3 -------------------------------------------------------------------
 
   /** Cuántos Avanzar y Girar llega a ejecutar la orden, contando repeticiones. */
-  def cuantasBasicas(o: Orden): Int = ???
+  def cuantasBasicas(o: Orden): Int = o match {
+    case Avanzar(_) => 1
+    case Girar(_) => 1
+    case Repetir(veces, orden) => if (veces <= 0) 0 else veces * cuantasBasicas(orden)
+    case Secuencia(Nil) => 0
+    case Secuencia(primera :: resto) => cuantasBasicas(primera) + cuantasBasicas(Secuencia(resto))
+  }
 
   /** Niveles de anidamiento: una básica tiene 1, una compuesta uno más que la más honda. */
-  def profundidad(o: Orden): Int = ???
+  def profundidad(o: Orden): Int = {
+    // la profundidad más honda entre las órdenes de una lista; la lista vacía aporta 0
+    def masHonda(ordenes: List[Orden]): Int = ordenes match {
+      case Nil => 0
+      case primera :: resto => math.max(profundidad(primera), masHonda(resto))
+    }
+
+    o match {
+      case Avanzar(_) => 1
+      case Girar(_) => 1
+      case Repetir(_, orden) => 1 + profundidad(orden)
+      case Secuencia(ordenes) => 1 + masHonda(ordenes)
+    }
+  }
 
   // Punto 4 -------------------------------------------------------------------
 
