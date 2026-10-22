@@ -161,4 +161,62 @@ class RobotCuadriculaPropiasTest extends AnyFunSuite {
   test("punto 4 propio: transformar conserva una secuencia vacía") {
     assert(transformar(Secuencia(Nil), (o: Orden) => o) == Secuencia(Nil))
   }
+
+  // Punto 5: simplificar ------------------------------------------------------
+
+  test("simplificar propia: un giro solo no cambia") {
+    assert(simplificar(Girar(Izquierda)) == Girar(Izquierda))
+  }
+
+  test("simplificar propia: Avanzar(0) solo se vuelve la secuencia vacía") {
+    assert(simplificar(Avanzar(0)) == Secuencia(Nil))
+  }
+
+  test("simplificar propia: una secuencia de un solo elemento es ese elemento") {
+    assert(simplificar(Secuencia(List(Girar(Derecha)))) == Girar(Derecha))
+  }
+
+  test("simplificar propia: tres avances seguidos se juntan en uno") {
+    assert(simplificar(Secuencia(List(Avanzar(1), Avanzar(2), Avanzar(3)))) == Avanzar(6))
+  }
+
+  test("simplificar propia: al quitar una orden vacía los avances vecinos se juntan") {
+    val o = Secuencia(List(Avanzar(1), Repetir(0, Girar(Derecha)), Avanzar(2)))
+    assert(simplificar(o) == Avanzar(3))
+  }
+
+  test("simplificar propia: repetir algo que no hace nada no hace nada") {
+    assert(simplificar(Repetir(3, Secuencia(Nil))) == Secuencia(Nil))
+  }
+
+  test("simplificar propia: repetir un número negativo de veces se vuelve la secuencia vacía") {
+    assert(simplificar(Repetir(-2, Avanzar(1))) == Secuencia(Nil))
+  }
+
+  test("simplificar propia: Repetir(1, ...) interior deja pasar la reducción a la secuencia de afuera") {
+    val o = Secuencia(List(Avanzar(1), Repetir(1, Secuencia(List(Avanzar(0), Avanzar(4)))), Girar(Derecha)))
+    assert(simplificar(o) == Secuencia(List(Avanzar(5), Girar(Derecha))))
+  }
+
+  test("simplificar propia: conserva las repeticiones y simplifica lo de adentro") {
+    assert(
+      simplificar(Repetir(3, Secuencia(List(Avanzar(1), Avanzar(1))))) ==
+        Repetir(3, Avanzar(2))
+    )
+  }
+
+  test("simplificar propia: una orden que ya está simplificada no cambia") {
+    assert(simplificar(cuadrado) == cuadrado)
+  }
+
+  test("simplificar propia: secuencias anidadas de un avance se juntan") {
+    val o = Secuencia(List(Secuencia(List(Avanzar(1))), Secuencia(List(Avanzar(2)))))
+    assert(simplificar(o) == Avanzar(3))
+  }
+
+  test("simplificar propia: avances opuestos dentro de Repetir dejan solo el giro y el mismo estado") {
+    val o = Repetir(2, Secuencia(List(Avanzar(3), Avanzar(-3), Girar(Izquierda))))
+    assert(simplificar(o) == Repetir(2, Girar(Izquierda)))
+    assert(ejecutar(inicial, simplificar(o)) == ejecutar(inicial, o))
+  }
 }

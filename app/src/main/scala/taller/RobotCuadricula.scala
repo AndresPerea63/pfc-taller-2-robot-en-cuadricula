@@ -101,5 +101,40 @@ class RobotCuadricula {
   // Punto 5 -------------------------------------------------------------------
 
   /** Una orden equivalente más corta, con las reglas del enunciado. */
-  def simplificar(o: Orden): Orden = ???
+  def simplificar(o: Orden): Orden = {
+    // Recibe una lista de órdenes ya simplificadas y, de derecha a izquierda:
+    //  - quita las que no hacen nada (Secuencia(Nil) y Avanzar(0)),
+    //  - junta dos Avanzar seguidos en uno solo con la suma de los pasos.
+    def limpiar(ordenes: List[Orden]): List[Orden] = ordenes match {
+      case Nil => Nil
+      case primera :: resto => (primera, limpiar(resto)) match {
+        case (Secuencia(Nil), limpias) => limpias
+        case (Avanzar(0), limpias) => limpias
+        case (Avanzar(a), Avanzar(b) :: cola) =>
+          if (a + b == 0) cola // los dos avances se cancelan
+          else Avanzar(a + b) :: cola
+        case (otra, limpias) => otra :: limpias
+      }
+    }
+
+    o match {
+      case Avanzar(0) => Secuencia(Nil) // regla 1
+      case Avanzar(_) => o
+      case Girar(_) => o
+      case Repetir(veces, orden) =>
+        if (veces <= 0) Secuencia(Nil) // regla 1: repetir cero (o menos) veces no hace nada
+        else simplificar(orden) match {
+          case Secuencia(Nil) => Secuencia(Nil) // repetir "nada" sigue siendo nada
+          case interior =>
+            if (veces == 1) interior // regla 3
+            else Repetir(veces, interior)
+        }
+      case Secuencia(ordenes) =>
+        limpiar(ordenes.map(orden => simplificar(orden))) match {
+          case Nil => Secuencia(Nil)
+          case unica :: Nil => unica // regla 4
+          case varias => Secuencia(varias)
+        }
+    }
+  }
 }
