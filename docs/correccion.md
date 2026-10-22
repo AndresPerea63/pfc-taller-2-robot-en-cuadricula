@@ -521,3 +521,131 @@ Se añadieron cinco pruebas propias para el punto 4: una para componer, una para
 3. aplicarA: se recorrió recursivamente la lista de estados y se ejecutó la orden sobre cada uno.
 4. transformar: se trataron los casos básicos y se reconstruyeron recursivamente los casos compuestos.
 Para la comprobación se ejecutaron las pruebas automáticas del proyecto. Las pruebas del punto 1 y del punto 4 pasaron; los fallos que aparecieron en la ejecución compartida correspondían a simplificar, del punto 5, que todavía no estaba implementado.
+
+## Punto 5: `simplificar`
+
+### Especificación
+
+`simplificar` devuelve una orden más corta con las cinco reglas del enunciado. Lo que hay
+que demostrar es que no cambia lo que hace el robot:
+
+$$
+\forall o \in \text{Orden},\ \forall e \in \text{Estado} :\quad E\big(e,\ \text{simplificar}(o)\big) = E(e, o)
+$$
+
+donde $E(e, o)$ es el estado que deja `ejecutar(e, o)`. Se prueba regla por regla. Para eso
+se usan estos hechos, que salen directamente de la definición de `ejecutar` (punto 2):
+
+- **(H1)** $E(e, \text{Secuencia}(\text{Nil})) = e$ y $E(e, \text{Avanzar}(0)) = e$, porque avanzar $0$
+  casillas suma $0$ a la posición.
+- **(H2)** $E\big(E(e, \text{Avanzar}(a)),\ \text{Avanzar}(b)\big) = E\big(e, \text{Avanzar}(a + b)\big)$.
+  `Avanzar` no cambia la dirección $d$, así que los dos avances suman sobre el mismo vector:
+  $(x, y) + a\,\delta(d) + b\,\delta(d) = (x, y) + (a + b)\,\delta(d)$.
+- **(H3)** $E\big(e, \text{Secuencia}(o_1 :: \text{resto})\big) = E\big(E(e, o_1), \text{Secuencia}(\text{resto})\big)$,
+  que es la definición.
+
+Se escribe $o \equiv o'$ cuando $E(e, o) = E(e, o')$ para todo estado $e$.
+
+### Lema 1: `limpiar` no cambia lo que hace la lista
+
+Para toda lista de órdenes $l$ y todo estado $e$: $E\big(e, \text{Secuencia}(\text{limpiar}(l))\big) = E\big(e, \text{Secuencia}(l)\big)$.
+
+**Demostración.** Inducción sobre la longitud de $l$.
+
+- **$l = \text{Nil}$.** `limpiar` devuelve `Nil`, y las dos partes valen $e$ por (H1).
+- **$l = p :: r$.** Sea $L = \text{limpiar}(r)$. Por hipótesis de inducción, para todo estado $e'$,
+  $E(e', \text{Secuencia}(L)) = E(e', \text{Secuencia}(r))$. Entonces, por (H3),
+
+  $$
+  E\big(e, \text{Secuencia}(p :: r)\big) = E\big(E(e, p), \text{Secuencia}(r)\big) = E\big(E(e, p), \text{Secuencia}(L)\big) \tag{$*$}
+  $$
+
+  Hay un caso por cada línea del `match` sobre `(primera, limpiar(resto))`:
+
+  1. **$p = \text{Secuencia}(\text{Nil})$** (regla 5). `limpiar` devuelve $L$. Como $E(e, p) = e$ por (H1),
+     $(*)$ es $E(e, \text{Secuencia}(L))$. Es lo que da el programa.
+  2. **$p = \text{Avanzar}(0)$** (regla 5). `limpiar` devuelve $L$ y $E(e, p) = e$ por (H1). Igual que el caso anterior.
+  3. **$p = \text{Avanzar}(a)$ y $L = \text{Avanzar}(b) :: \text{cola}$ con $a + b = 0$** (reglas 2 y 5). `limpiar`
+     devuelve `cola`. Por (H3) y (H2),
+     $E(e, \text{Secuencia}(\text{Avanzar}(a) :: \text{Avanzar}(b) :: \text{cola})) = E\big(E(E(e, \text{Avanzar}(a)), \text{Avanzar}(b)), \text{Secuencia}(\text{cola})\big) = E\big(E(e, \text{Avanzar}(0)), \text{Secuencia}(\text{cola})\big)$,
+     y por (H1) esto es $E(e, \text{Secuencia}(\text{cola}))$.
+  4. **$p = \text{Avanzar}(a)$ y $L = \text{Avanzar}(b) :: \text{cola}$ con $a + b \ne 0$** (regla 2). `limpiar` devuelve
+     $\text{Avanzar}(a + b) :: \text{cola}$. Por (H3), su resultado es $E\big(E(e, \text{Avanzar}(a + b)), \text{Secuencia}(\text{cola})\big)$,
+     que por (H2) es igual a $E\big(E(E(e, \text{Avanzar}(a)), \text{Avanzar}(b)), \text{Secuencia}(\text{cola})\big)$, es decir a $(*)$.
+  5. **Cualquier otro caso.** `limpiar` devuelve $p :: L$, y por (H3) $E(e, \text{Secuencia}(p :: L)) = E(E(e, p), \text{Secuencia}(L))$, que es $(*)$. $\blacksquare$
+
+### Lema 2: sustituir partes equivalentes da una orden equivalente
+
+- **(a) Repetir.** Si $o' \equiv o''$, entonces $\text{Repetir}(v, o') \equiv \text{Repetir}(v, o'')$.
+  Inducción sobre $v$. Si $v \le 0$ las dos dejan $e$. Si $v > 0$,
+  $E(e, \text{Repetir}(v, o')) = E\big(E(e, o'), \text{Repetir}(v - 1, o')\big) = E\big(E(e, o''), \text{Repetir}(v - 1, o'')\big) = E(e, \text{Repetir}(v, o''))$,
+  usando $o' \equiv o''$ y la hipótesis para $v - 1$.
+- **(b) Secuencia.** Si $o_i \equiv o'_i$ para cada $i$, entonces $\text{Secuencia}(o_1, \dots, o_k) \equiv \text{Secuencia}(o'_1, \dots, o'_k)$.
+  Inducción sobre $k$ con (H3): $E(e, \text{Secuencia}(o_1 :: \text{resto})) = E(E(e, o_1), \text{Secuencia}(\text{resto})) = E(E(e, o'_1), \text{Secuencia}(\text{resto}'))$.
+- **(c) Repetir de una orden que no hace nada.** Si $o' \equiv \text{Secuencia}(\text{Nil})$ y $v > 0$, entonces
+  $E(e, \text{Repetir}(v, o')) = e$. Inducción sobre $v$: $E(e, \text{Repetir}(v, o')) = E\big(E(e, o'), \text{Repetir}(v - 1, o')\big) = E\big(e, \text{Repetir}(v - 1, o')\big) = e$.
+
+### Teorema: `simplificar` no cambia el resultado
+
+Para toda orden $o$ y todo estado $e$: $E(e, \text{simplificar}(o)) = E(e, o)$.
+
+**Demostración.** Inducción estructural sobre $o$, con un caso por cada alternativa y, dentro de ellos, un caso por cada regla que se aplica.
+
+- **$\text{Avanzar}(0)$ (regla 1).** Devuelve `Secuencia(Nil)`. Por (H1), $E(e, \text{Secuencia}(\text{Nil})) = e = E(e, \text{Avanzar}(0))$.
+- **$\text{Avanzar}(n)$ con $n \ne 0$, y $\text{Girar}(s)$.** Devuelven la misma orden. No hay nada que probar.
+- **$\text{Repetir}(v, o')$.**
+  - Si $v \le 0$ (regla 1): devuelve `Secuencia(Nil)`, que deja $e$ por (H1), y $\text{Repetir}(v, o')$ también deja $e$ por la definición de `ejecutar`.
+  - Si $v > 0$, sea $i = \text{simplificar}(o')$. Por hipótesis de inducción, $i \equiv o'$.
+    - Si $i = \text{Secuencia}(\text{Nil})$ (regla 5): devuelve `Secuencia(Nil)`, que deja $e$. Como $o' \equiv i \equiv \text{Secuencia}(\text{Nil})$, por el Lema 2(c) $E(e, \text{Repetir}(v, o')) = e$. Coinciden.
+    - Si $v = 1$ (regla 3): devuelve $i$. Por definición, $E(e, \text{Repetir}(1, o')) = E\big(E(e, o'), \text{Repetir}(0, o')\big) = E(e, o')$, que es $E(e, i)$ porque $i \equiv o'$.
+    - En otro caso devuelve $\text{Repetir}(v, i)$, que es equivalente a $\text{Repetir}(v, o')$ por el Lema 2(a).
+- **$\text{Secuencia}(os)$.** Sea $os' = \text{map}(\text{simplificar}, os)$ y $L = \text{limpiar}(os')$.
+  Por hipótesis de inducción cada elemento de $os'$ es equivalente al de $os$, así que, por el Lema 2(b),
+  $\text{Secuencia}(os') \equiv \text{Secuencia}(os)$. Por el Lema 1, $\text{Secuencia}(L) \equiv \text{Secuencia}(os')$.
+  El programa mira $L$:
+  - $L = \text{Nil}$: devuelve `Secuencia(Nil)`, que es $\text{Secuencia}(L)$.
+  - $L = u :: \text{Nil}$ (regla 4): devuelve $u$, y por (H3) y (H1) $E(e, \text{Secuencia}(u :: \text{Nil})) = E\big(E(e, u), \text{Secuencia}(\text{Nil})\big) = E(e, u)$.
+  - Otro caso: devuelve $\text{Secuencia}(L)$.
+
+  En los tres casos el resultado es equivalente a $\text{Secuencia}(L) \equiv \text{Secuencia}(os)$. $\blacksquare$
+
+**Terminación.** Cada llamado recursivo de `simplificar` es sobre una parte propia de la orden,
+y `limpiar` se llama sobre una lista que se acorta en uno en cada llamado. Los dos terminan.
+
+### Resumen regla por regla
+
+| Regla | Dónde se aplica | Por qué conserva el estado |
+|---|---|---|
+| 1. `Avanzar(0)` y `Repetir(0, _)` se vuelven `Secuencia(Nil)` | casos `Avanzar(0)` y `Repetir` con $v \le 0$ | (H1) y la definición de `Repetir` |
+| 2. Dos `Avanzar` seguidos se juntan | `limpiar`, casos 3 y 4 | (H2): `Avanzar` no cambia la dirección |
+| 3. `Repetir(1, o)` es `o` | `Repetir` con $v = 1$ | $E(e, \text{Repetir}(1, o)) = E(e, o)$ |
+| 4. Una secuencia de un elemento es ese elemento | `Secuencia` con $L = u :: \text{Nil}$ | (H3) y (H1) |
+| 5. Las órdenes que no hacen nada se quitan | `limpiar`, casos 1 y 2, y `Repetir` de algo vacío | (H1) y Lema 2(c) |
+
+### Aplicado a un ejemplo
+
+Para `O = Secuencia(List(Avanzar(1), Repetir(1, Secuencia(List(Avanzar(0), Avanzar(4)))), Girar(Derecha)))`
+y el estado `inicial = (0, 0, N)`:
+
+$$
+E(\text{inicial}, O) = (0, 5, E) = E\big(\text{inicial},\ \text{Secuencia}(\text{Avanzar}(5), \text{Girar}(\text{Derecha}))\big)
+$$
+
+La traza paso a paso está en el informe de proceso.
+
+### Comprobación mediante pruebas
+
+Las pruebas dadas comprueban los ejemplos del enunciado, que `simplificar` es idempotente y que
+`ejecutar` da el mismo estado antes y después de simplificar sobre varios estados y órdenes.
+Se añadieron doce pruebas propias: cada regla por separado, tres avances seguidos, avances que
+se juntan al quitar una orden vacía, repeticiones negativas o de algo vacío, anidamiento,
+una orden que ya está simplificada y un caso donde se cancelan dos avances dentro de un `Repetir`.
+
+### Proceso de implementación
+
+1. Se escribió un caso por cada alternativa de `Orden`, como en las otras funciones.
+2. Para `Secuencia` se simplifica primero cada elemento con `map`, y después `limpiar` quita las
+   órdenes vacías y junta los avances.
+3. `limpiar` recorre de derecha a izquierda, de modo que lo que queda a la derecha ya está limpio
+   cuando se decide qué hacer con la orden de la izquierda.
+4. Se agregaron las pruebas propias y se argumentó la corrección con el Lema 1, el Lema 2 y el teorema.
