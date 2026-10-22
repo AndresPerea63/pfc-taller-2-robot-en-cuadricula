@@ -361,3 +361,169 @@ transformar(Secuencia(Nil), identidad)
 - rutina construye una orden repetida que contiene un avance y un giro.
 - aplicarA recorre recursivamente una lista de estados y ejecuta una orden sobre cada uno.
 - transformar recorre las órdenes compuestas, transforma las órdenes básicas y reconstruye la estructura original.
+
+
+# Informe de proceso: punto 5
+
+## Punto 5: `simplificar`
+
+```scala
+def simplificar(o: Orden): Orden = {
+  def limpiar(ordenes: List[Orden]): List[Orden] = ordenes match {
+    case Nil => Nil
+    case primera :: resto => (primera, limpiar(resto)) match {
+      case (Secuencia(Nil), limpias) => limpias
+      case (Avanzar(0), limpias) => limpias
+      case (Avanzar(a), Avanzar(b) :: cola) =>
+        if (a + b == 0) cola
+        else Avanzar(a + b) :: cola
+      case (otra, limpias) => otra :: limpias
+    }
+  }
+
+  o match {
+    case Avanzar(0) => Secuencia(Nil)
+    case Avanzar(_) => o
+    case Girar(_) => o
+    case Repetir(veces, orden) =>
+      if (veces <= 0) Secuencia(Nil)
+      else simplificar(orden) match {
+        case Secuencia(Nil) => Secuencia(Nil)
+        case interior =>
+          if (veces == 1) interior
+          else Repetir(veces, interior)
+      }
+    case Secuencia(ordenes) =>
+      limpiar(ordenes.map(orden => simplificar(orden))) match {
+        case Nil => Secuencia(Nil)
+        case unica :: Nil => unica
+        case varias => Secuencia(varias)
+      }
+  }
+}
+```
+
+### Cómo funciona
+
+`simplificar` recorre la orden con un caso por cada alternativa de `Orden`, igual que las
+otras funciones. La diferencia es el orden: **primero se simplifica lo de adentro y después
+se aplican las reglas a lo de afuera**. Así, cuando una regla mira una orden, sus partes ya
+están reducidas, y una reducción de adentro puede habilitar otra de afuera sin tener que
+recorrer la orden de nuevo. Eso cumple lo de "tantas veces como haga falta".
+
+| Caso | Qué hace | Regla |
+|---|---|---|
+| `Avanzar(0)` | devuelve `Secuencia(Nil)` | 1 |
+| `Avanzar(n)`, `Girar(s)` | quedan igual | |
+| `Repetir(v, o')` con `v <= 0` | devuelve `Secuencia(Nil)` | 1 |
+| `Repetir(v, o')` con `o'` vacía | devuelve `Secuencia(Nil)`: repetir nada es nada | 5 |
+| `Repetir(1, o')` | devuelve `o'` ya simplificada | 3 |
+| `Repetir(v, o')` con `v >= 2` | `Repetir(v, simplificar(o'))` | |
+| `Secuencia(os)` | simplifica cada una, la pasa por `limpiar` y mira cuántas quedan | 2, 4, 5 |
+
+`limpiar` es la función auxiliar que vive dentro de `simplificar`. Recorre la lista de
+derecha a izquierda: primero limpia el resto y luego decide qué hacer con la primera orden.
+
+- Si la primera es `Secuencia(Nil)` o `Avanzar(0)`, no hace nada y se descarta (regla 5).
+- Si es un `Avanzar(a)` y lo que sigue empieza por `Avanzar(b)`, los junta en `Avanzar(a + b)`
+  (regla 2). Si la suma es 0, los dos desaparecen.
+- En cualquier otro caso, la deja donde está.
+
+Después de `limpiar`, la secuencia queda vacía (`Secuencia(Nil)`), con un solo elemento
+(se devuelve ese elemento, regla 4) o con varios (`Secuencia(varias)`).
+
+### Traza 1: una reducción de adentro habilita otra de afuera
+
+Sea `S2 = Secuencia(List(Avanzar(0), Avanzar(4)))` y
+
+`O = Secuencia(List(Avanzar(1), Repetir(1, S2), Girar(Derecha)))`.
+
+```
+simplificar(O)
+= limpiar( List(simplificar(Avanzar(1)), simplificar(Repetir(1, S2)), simplificar(Girar(Derecha))) ) y se mira el resultado
+
+  simplificar(Avanzar(1)) = Avanzar(1)
+
+  simplificar(Repetir(1, S2))
+  = simplificar(S2) y se mira el resultado
+      simplificar(S2) = limpiar( List(simplificar(Avanzar(0)), simplificar(Avanzar(4))) )
+                      = limpiar( List(Secuencia(Nil), Avanzar(4)) )
+                        limpiar(List(Avanzar(4))) = List(Avanzar(4))
+                        (Secuencia(Nil), List(Avanzar(4))) => List(Avanzar(4))   // la vacía se descarta
+                      = List(Avanzar(4)), que queda como Avanzar(4)   // un solo elemento
+  = Avanzar(4)   // veces == 1: se devuelve el interior
+
+  simplificar(Girar(Derecha)) = Girar(Derecha)
+
+= limpiar( List(Avanzar(1), Avanzar(4), Girar(Derecha)) )
+    limpiar(List(Girar(Derecha)))                     = List(Girar(Derecha))
+    (Avanzar(4), List(Girar(Derecha)))                => List(Avanzar(4), Girar(Derecha))
+    (Avanzar(1), Avanzar(4) :: List(Girar(Derecha)))  => Avanzar(5) :: List(Girar(Derecha))   // 1 + 4
+= List(Avanzar(5), Girar(Derecha)), que queda como Secuencia(List(Avanzar(5), Girar(Derecha)))
+```
+
+El `Repetir(1, ...)` y el `Avanzar(0)` de adentro desaparecieron primero, y por eso el
+`Avanzar(1)` y el `Avanzar(4)` quedaron uno al lado del otro y se pudieron juntar. Con una
+sola pasada de las reglas sobre la orden original eso no habría pasado.
+
+**Posiciones del robot.** La orden original y la simplificada dejan al robot en el mismo lugar:
+
+| Orden original `O` | Estado | | Orden simplificada | Estado |
+|---|---|---|---|---|
+| (inicio) | `(0, 0, N)` | | (inicio) | `(0, 0, N)` |
+| `Avanzar(1)` | `(0, 1, N)` | | `Avanzar(5)` | `(0, 5, N)` |
+| `Avanzar(0)` | `(0, 1, N)` | | | |
+| `Avanzar(4)` | `(0, 5, N)` | | | |
+| `Girar(Derecha)` | `(0, 5, E)` | | `Girar(Derecha)` | `(0, 5, E)` |
+
+### Traza 2: dos avances que se cancelan
+
+Con `O = Secuencia(List(Avanzar(2), Avanzar(-2)))`:
+
+```
+simplificar(O)
+= limpiar( List(Avanzar(2), Avanzar(-2)) ) y se mira el resultado
+    limpiar(List(Avanzar(-2))) = List(Avanzar(-2))
+    (Avanzar(2), Avanzar(-2) :: Nil) => 2 + (-2) == 0, así que devuelve la cola: Nil
+= Nil, que queda como Secuencia(Nil)
+```
+
+Posiciones: la orden original lleva el robot de `(0, 0, N)` a `(0, 2, N)` y de ahí de vuelta a
+`(0, 0, N)`. La simplificada, `Secuencia(Nil)`, lo deja en `(0, 0, N)`. Es el mismo estado.
+
+### Cómo se recorre la orden
+
+```mermaid
+flowchart TD
+    A["simplificar(o)"] --> B{"¿qué orden es?"}
+    B -->|"Avanzar(0)"| C["Secuencia(Nil)"]
+    B -->|"Avanzar(n) o Girar(s)"| D["la misma orden"]
+    B -->|"Repetir(v, o')"| E{"¿v <= 0?"}
+    E -->|sí| C
+    E -->|no| F["simplificar(o')"]
+    F --> G{"¿queda vacía o v == 1?"}
+    G -->|"vacía"| C
+    G -->|"v == 1"| H["el interior"]
+    G -->|"si no"| I["Repetir(v, interior)"]
+    B -->|"Secuencia(os)"| J["simplificar cada una con map"]
+    J --> K["limpiar: quita vacías y junta avances"]
+    K --> L{"¿cuántas quedan?"}
+    L -->|"ninguna"| C
+    L -->|"una"| M["esa orden"]
+    L -->|"varias"| N["Secuencia(varias)"]
+```
+
+Cada llamado recursivo se hace sobre una parte propia de la orden y `limpiar` recorre una
+lista que se acorta en cada llamado, así que el cálculo termina.
+
+## Resumen del proceso
+- girar resuelve cada combinación de dirección y sentido mediante un match.
+- ejecutar recorre la orden con un caso por alternativa; la traza del cuadrado muestra el estado del robot en cada paso.
+- cuantasBasicas y profundidad miden la orden sin ejecutarla.
+- componer agrupa dos órdenes en una secuencia, conservando su orden.
+- rutina construye una orden repetida que contiene un avance y un giro.
+- aplicarA recorre recursivamente una lista de estados y ejecuta una orden sobre cada uno.
+- transformar recorre las órdenes compuestas, transforma las órdenes básicas y reconstruye la estructura original.
+ No newline at end of file
+- transformar recorre las órdenes compuestas, transforma las órdenes básicas y reconstruye la estructura original.
+- simplificar reduce primero lo de adentro y después aplica las reglas a lo de afuera; con eso una sola recursión basta y el estado final del robot no cambia.
